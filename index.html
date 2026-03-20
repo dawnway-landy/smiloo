@@ -97,33 +97,24 @@
       left: 50%;
       bottom: 14px;
       z-index: 25;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: min(calc(100% - 24px), 420px);
-      min-height: 62px;
-      padding: 14px 24px;
-      border: 2px solid #111;
-      border-radius: 20px;
-      background: var(--blue);
-      color: #fff;
-      text-decoration: none;
-      font-size: 1.5rem;
-      font-weight: 800;
-      line-height: 1;
-      letter-spacing: -0.01em;
-      box-shadow: 6px 6px 0 rgba(17, 17, 17, 0.28);
+      display: block;
+      width: min(calc(100% - 14px), 556px);
       transform: translate(-50%, 120%);
       opacity: 0;
       pointer-events: none;
       transition: transform 200ms ease, opacity 200ms ease;
-      white-space: nowrap;
     }
 
     .sticky-cta.is-visible {
       transform: translate(-50%, 0);
       opacity: 1;
       pointer-events: auto;
+    }
+
+    .sticky-cta img {
+      display: block;
+      width: 100%;
+      height: auto;
     }
 
     .sticky-cta:focus-visible {
@@ -133,9 +124,7 @@
 
     @media (max-width: 480px) {
       .sticky-cta {
-        min-height: 56px;
-        padding: 12px 20px;
-        font-size: 1.28rem;
+        width: min(calc(100% - 10px), 556px);
       }
     }
 
@@ -184,7 +173,7 @@
     href="https://pf.kakao.com/_YOUR_ID"
     target="_blank"
     rel="noreferrer">
-    카톡 플친하기
+    <img src="sticky-button.png" alt="카톡 플러스친구 추가하기">
   </a>
 
   <script>
@@ -193,10 +182,96 @@
     const links = document.querySelectorAll(".js-kakao-link");
     const stickyButton = document.querySelector(".sticky-cta");
     const imageCta = document.querySelector(".image-cta");
+    const stickyImage = stickyButton ? stickyButton.querySelector("img") : null;
+
+    const makeOuterWhiteTransparent = (img) => {
+      const canvas = document.createElement("canvas");
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+
+      if (!width || !height) {
+        return;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.drawImage(img, 0, 0);
+
+      const imageData = context.getImageData(0, 0, width, height);
+      const { data } = imageData;
+      const visited = new Uint8Array(width * height);
+      const queue = new Uint32Array(width * height);
+      let head = 0;
+      let tail = 0;
+
+      const isNearWhite = (offset) =>
+        data[offset + 3] > 0 &&
+        data[offset] >= 235 &&
+        data[offset + 1] >= 235 &&
+        data[offset + 2] >= 235;
+
+      const enqueue = (x, y) => {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+          return;
+        }
+
+        const index = y * width + x;
+        if (visited[index]) {
+          return;
+        }
+
+        const offset = index * 4;
+        if (!isNearWhite(offset)) {
+          return;
+        }
+
+        visited[index] = 1;
+        queue[tail++] = index;
+      };
+
+      for (let x = 0; x < width; x += 1) {
+        enqueue(x, 0);
+        enqueue(x, height - 1);
+      }
+
+      for (let y = 0; y < height; y += 1) {
+        enqueue(0, y);
+        enqueue(width - 1, y);
+      }
+
+      while (head < tail) {
+        const index = queue[head++];
+        const x = index % width;
+        const y = (index - x) / width;
+        const offset = index * 4;
+
+        data[offset + 3] = 0;
+
+        enqueue(x + 1, y);
+        enqueue(x - 1, y);
+        enqueue(x, y + 1);
+        enqueue(x, y - 1);
+      }
+
+      context.putImageData(imageData, 0, 0);
+      img.src = canvas.toDataURL("image/png");
+    };
 
     links.forEach((link) => {
       link.href = KAKAO_PLUS_URL;
     });
+
+    if (stickyImage) {
+      if (stickyImage.complete) {
+        makeOuterWhiteTransparent(stickyImage);
+      } else {
+        stickyImage.addEventListener("load", () => makeOuterWhiteTransparent(stickyImage), {
+          once: true,
+        });
+      }
+    }
 
     if (stickyButton) {
       let footerButtonVisible = false;
